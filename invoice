@@ -1,0 +1,184 @@
+#!/usr/bin/python3
+import pdfkit 
+import psycopg2
+import os
+import psutil
+import json
+import configparser
+from datetime import date, datetime, timedelta
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText                    
+from email.mime.application import MIMEApplication
+
+config = configparser.ConfigParser()
+config.read('.config')
+
+def generate(company, addr, invoiceNo, today, duedate, items):
+    options = {
+        'page-size': 'A4',
+        'margin-top': '0in',
+        'margin-right': '0in',
+        'margin-bottom': '0in',
+        'margin-left': '0in',
+        'encoding': "UTF-8",
+        'custom-header' : [
+            ('Accept-Encoding', 'gzip')
+        ],
+        'cookie': [
+            ('cookie-name1', 'cookie-value1'),
+            ('cookie-name2', 'cookie-value2'),
+        ],
+        'no-outline': None
+    }
+    table = ''
+    quantity = 0
+    amount = 0
+    for item in items:
+        table += '<tr><td>'+item[0]+'</td><td>'+item[1]+'</td><td class="center">$'+'{:,.2f}'.format(item[2])+'</td><td class="center">'+'{:,.2f}'.format(item[3])+'</td><td class="right">$'+'{:,.2f}'.format(item[2]*item[3])+'</td></tr>'
+        quantity += item[3]
+        amount += item[2]*item[3]
+    html = '<!DOCTYPE html><html><head><style>@import url(https://fonts.googleapis.com/css2?family=Marck+Script:wght@400;900&family=Roboto:wght@400;900&display=swap);body{font-family: "Roboto";font-size: 1.2rem;}.header{position: absolute; top: 0; left: 0; width: calc(100% - 50px); height: 128px; background-color: #29a0e6; padding: 25px;}.header img{position: absolute; top: 15px; left: 45px;}.header .title{font-size: 4rem; font-family: "Marck Script"; font-weight: 900; color: white; text-align: left; position: absolute; bottom: 15px;}.header .info{font-size: 1.2rem; color: white; text-align: right; margin-top: 15px; line-height:1.8rem;}.header a{text-decoration: none; color: white;}.bill{position: relative; height: 150px; margin-top: 178px; padding: 25px; border-bottom: 1px solid #D1D1D1;}.bill .leftpart{position: absolute; top: 25px; left: 25px; text-align: left;}.bill .leftpart .to{line-height: 2rem; font-size: 1.2rem;}.bill .leftpart .company{line-height: 2rem; font-size: 1.2rem; font-weight: 900;}.bill .leftpart .addr{margin-top: 5px; line-height: 1.5rem; font-size: 1rem;}.bill .rightpart{position: absolute; top: 25px; right: 25px; text-align: right; font-size: 1rem; line-height: 1.6rem;}.bold{font-weight: 900;}.left{text-align: left;}.right{text-align: right;}.center{text-align: center;}.details{width: calc(100% - 50px); padding: 25px;}.details table{width: 100%; border: none; border-collapse: collapse; cellspacing: 0; cellpadding: 0;}.detail table tr th,td{border: none;line-height: 2.5rem;}.footer{position: relative; top: 240px; margin: 0 -8px;}.footer .inner{position: absolute; bottom: 0; left: 0; width: calc(100% - 50px); height: 78px; background-color: #29a0e6; margin-top: 25px; padding: 25px;}.footer .inner .leftpart{position: absolute; top: 0; left: 0; width: 60%; height: 98px; background-color: #e3f6ff; padding: 15px 15px; font-size: 1rem;}.footer .inner .rightpart{position: absolute; right: 0; top: 0; width: calc(40% - 60px); height: 78px; padding: 25px 15px;}</style></head><body><div class="header"><img src="https://www.iceloof.com/assets/icons/icon.png"/><div class="title">Invoice</div><div class="info"><div>Hurin Hu</div><div>hurin@live.ca</div><div>+64 2102470043</div><div><a href="https://www.iceloof.com" target="_blank">https://www.iceloof.com</a></div></div></div><div class="bill"><div class="leftpart"><div class="to">BILL TO:</div><div class="company">'+company+'</div><div class="addr">'+addr+'</div></div><div class="rightpart"><div class="bold">INVOICE #</div><div>INV'+str(invoiceNo)+'</div><div class="bold">DATE</div><div>'+today+'</div><div class="bold">DUE</div><div>'+duedate+'</div></div></div><div class="details"><table><thead><tr style="border-bottom: 1px solid #D1D1D1;"><th class="left bold">Date</th><th class="left bold">Item</th><th class="center bold">Rate</th><th class="center bold">Quantity</th><th class="right bold">Amount</th></tr></thead><tbody>'+table+'<tr style="border-top: 1px solid #D1D1D1; border-bottom: 1px solid #D1D1D1;"><td class="bold">Total</td><td></td><td></td><td class="center">'+'{:,.2f}'.format(quantity)+'</td><td class="right">$'+'{:,.2f}'.format(amount)+'</td></tr><tr><td></td><td></td><td style="border-bottom: 1px solid #D1D1D1; font-weight:900;" colspan="2">Balance Due</td><td style="border-bottom: 1px solid #D1D1D1; text-align: right;">$'+'{:,.2f}'.format(amount)+'</td></tr></tbody></table></div><div class="footer"><div class="inner"><div class="leftpart"><div style="font-weight: 900; line-height: 1.5rem;">Payment Instructions</div><div><div style="font-weight: 900; line-height: 1.2rem; display: inline-block; width: 80px;">To</div>Hurin Hu</div><div><div style="font-weight: 900; line-height: 1.2rem; display: inline-block; width: 80px;">Bank</div>Westpac NZ</div><div><div style="font-weight: 900; line-height: 1.2rem; display: inline-block; width: 80px;">Account</div>03-1399-0143883-001</div><div><div style="font-weight: 900; line-height: 1.2rem; display: inline-block; width: 80px;">Ref.</div>'+str(invoiceNo)+'</div></div><div class="rightpart"><div style="text-align: right; font-size: 1.2rem; line-height: 2rem; color: #fff;">Total</div><div style="text-align: right; font-size: 2rem; font-weight: 900; color: #fff;">$'+'{:,.2f}'.format(amount)+'</div></div></div></div><script>var height=document.documentElement.scrollHeight; height=1802-(height%1802)+240; document.getElementsByClassName("footer")[0].style.top=height+"px"; </script></body></html>'
+
+    pdfkit.from_string(html, '/invoices/INV'+str(invoiceNo)+'.pdf', options=options)
+    return amount
+
+def sendEmail(invoiceNo, to, amount, duedate):
+    try:
+        html = "<html><head><title>Invoice</title></head><body style='font-family: Comic Sans MS'>Hi,<br><p>This is your invoice for the service, the due balance is $"+'{:,.2f}'.format(amount)+", please follow the instruction to pay before due date "+duedate+". If you have any questions, please contact me as soon as possible.<br><p>Kind regards, <br>Hurin Hu<br><a href=\"mailto:hurin@live.ca\">hurin@live.ca</a><br><a href=\"https://www.iceloof.com\">https://www.iceloof.com</a></p></body></html>"
+        filename = '/invoices/INV'+str(invoiceNo)+'.pdf'
+        msg = MIMEMultipart('mixed')
+        msg['Subject'] = "Invoice ("+str(invoiceNo)+")"
+        msg['From'] = "Iceloof Admin<"+config['email']['email']+">"
+        msg['To'] = to
+        msg['Cc'] = config['email']['to']
+        part2 = MIMEText(html, 'html')
+        fp=open(filename,'rb')
+        att = MIMEApplication(fp.read(),_subtype="pdf")
+        fp.close()
+        att.add_header('Content-Disposition','attachment',filename='INV'+str(invoiceNo)+'.pdf')
+        msg.attach(att)
+        msg.attach(part2)
+        s = smtplib.SMTP_SSL(host=config['email']['host'],port=config['email']['port'])
+        s.login(config['email']['email'],config['email']['password'])
+        s.sendmail(msg['From'], [to, msg['Cc']], msg.as_string())
+        s.quit()
+    except:
+        menu()
+
+def saveDB(invoiceNo, company, addr, today, duedate, items, paid, email):
+    try:
+        sql = 'INSERT INTO invoice (invoiceno, company, address, issuedate, duedate, items, paid, email) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)'
+        con = psycopg2.connect( host=config['db']['host'], user=config['db']['user'], password=config['db']['pwd'], dbname="postgres", options="-c search_path=dbo,invoice" )
+        cur = con.cursor()
+        cur.execute(sql, (invoiceNo, company, addr, today, duedate, json.dumps(items), paid, email))
+        con.commit()
+        cur.close()
+        con.close()
+    except:
+        menu()
+        
+def getLatestInvoiceNo(d=0):
+    try:
+        d1 = d*1000+1
+        d2 = d*1000+999
+        sql = "SELECT INVOICENO FROM INVOICE WHERE INVOICENO>="+str(d1)+" AND INVOICENO<="+str(d2)+" ORDER BY INVOICENO DESC LIMIT 1"
+        if d == 0:
+            sql = "SELECT INVOICENO FROM INVOICE ORDER BY INVOICENO DESC LIMIT 1"
+        con = psycopg2.connect( host=config['db']['host'], user=config['db']['user'], password=config['db']['pwd'], dbname="postgres", options="-c search_path=dbo,invoice" )
+        cur = con.cursor()
+        cur.execute(sql)
+        result = cur.fetchall()
+        cur.close()
+        con.close()
+        invoiceNo = int(date.today().strftime('%Y%m%d001'))
+        if len(result)>0:
+            if result[0][0] >= invoiceNo:
+                invoiceNo = result[0][0]+1
+        elif d != 0:
+            invoiceNo = d*1000+1
+        return invoiceNo
+    except:
+        return None
+
+def getItem():
+    try:
+        print()
+        print('Add new item')
+        d = input('Date: ')
+        i = input('Item: ')
+        r = float(input('Rate: '))
+        q = float(input('Qty:  '))
+        return [d,i,r,q]
+    except:
+        print('Input Error!')
+        return getItem()
+    
+def generateInput():
+    try:
+        print('---------------------------------------------------')
+        company = input('Company name: ')
+        addr = input('Address: ')
+        today = input('Issue date (yyyymmdd/skip): ')
+        if len(today) == 0 or today == 'skip':
+            today = date.today().strftime('%b %d, %Y')
+            invoiceNo = getLatestInvoiceNo()
+        else:
+            invoiceNo = getLatestInvoiceNo(int(today))
+            today = datetime.strptime(today, '%Y%m%d').strftime('%b %d, %Y')
+        if invoiceNo is None:
+            print('invoiceNo ERROR!')
+            menu()
+        duedate = input('Due date (yyyymmdd/skip): ')
+        if len(duedate) == 0 or duedate == 'skip':
+            duedate = (date.today()+timedelta(days=7)).strftime('%b %d, %Y')
+        else:
+            duedate = datetime.strptime(duedate, '%Y%m%d').strftime('%b %d, %Y')
+        email = input('Email to: ')
+        paid = input('Paid (Y/N): ')
+        if paid == 'Y':
+            paid = True
+        else:
+            paid = False
+        num = int(input('No. of items: '))
+        items = []
+        for i in range(num):
+            item = getItem()
+            items.append(item)
+        print('---------------------------------------------------')
+        print('Generating invoice ...')
+        try:
+            amount = generate(company, addr, invoiceNo, today, duedate, items)
+        except:
+            print('Input Error!')
+            return menu()
+        print('Invoice INV'+str(invoiceNo)+' generated')
+        if len(email) != 0:
+            sendEmail(invoiceNo, email, amount, duedate)
+            print('Email sent to '+email)
+        saveDB(invoiceNo, company, addr, today, duedate, items, paid, email)
+    except:
+        print('Input Error!')
+        menu()
+    
+    
+def menu():
+    print('---------------------------------------------------')
+    print('Welcome to Invoice System')
+    print('1. Generate new invoice')
+    print('2. Exit')
+    print('---------------------------------------------------')
+    try:
+        menu = int(input('Please ENTER menu: '))
+        if menu == 1:
+            generateInput()
+        elif menu == 2:
+            current_system_pid = os.getpid()
+            ThisSystem = psutil.Process(current_system_pid)
+            ThisSystem.terminate()
+    except:
+        print('Input ERROR!')
+        menu()
+
+if __name__ == "__main__":
+    menu()
