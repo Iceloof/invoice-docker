@@ -117,7 +117,7 @@ def getItem():
 def generateInput():
     try:
         print('---------------------------------------------------')
-        company = input('Company name: ')
+        company = input('Client: ')
         addr = input('Address: ')
         today = input('Issue date (yyyymmdd/skip): ')
         if len(today) == 0 or today == 'skip':
@@ -146,17 +146,38 @@ def generateInput():
             item = getItem()
             items.append(item)
         print('---------------------------------------------------')
-        print('Generating invoice ...')
-        try:
-            amount = generate(company, addr, invoiceNo, today, duedate, items)
-        except:
-            print('Input Error!')
-            return menu()
-        print('Invoice INV'+str(invoiceNo)+' generated')
-        if len(email) != 0:
-            sendEmail(invoiceNo, email, amount, duedate)
-            print('Email sent to '+email)
-        saveDB(invoiceNo, company, addr, today, duedate, items, paid, email)
+        print('Preview')
+        print('Client: '+company)
+        print('Address: '+addr)
+        print('Issue Date: '+today)
+        print('Due Date: '+duedate)
+        print('InvoiceNo.: INV'+str(invoiceNo))
+        print('Paid: '+str(paid))
+        print('Email: '+email)
+        print ("{:<15} {:<25} {:<16} {:<15} {:<21}".format('Date','Item','Rate','Quantity','Amount'))
+        balance = 0
+        for item in items:
+            print ("{:<15} {:<25} ${:<15} {:<15} ${:<20}".format(item[0],item[1],round(item[2],2),round(item[3],2),round(item[2]*item[3],2)))
+            balance += item[2]*item[3]
+        print('Balance Due: $'+str(round(balance,2)))
+        print('---------------------------------------------------')
+        confirm = input('Confirm (Y/N):')
+        if confirm == 'Y':
+            print('---------------------------------------------------')
+            print('Generating invoice ...')
+            try:
+                amount = generate(company, addr, invoiceNo, today, duedate, items)
+            except:
+                print('Input Error!')
+                return menu()
+            print('Invoice INV'+str(invoiceNo)+' generated')
+            if len(email) != 0:
+                sendEmail(invoiceNo, email, amount, duedate)
+                print('Email sent to '+email)
+            saveDB(invoiceNo, company, addr, today, duedate, items, paid, email)
+            menu()
+        else:
+            menu()
     except:
         print('Input Error!')
         menu()
