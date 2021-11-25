@@ -48,7 +48,7 @@ def sendEmail(invoiceNo, to, amount, duedate):
         filename = '/invoices/INV'+str(invoiceNo)+'.pdf'
         msg = MIMEMultipart('mixed')
         msg['Subject'] = "Invoice ("+str(invoiceNo)+")"
-        msg['From'] = "Iceloof Admin<"+config['email']['email']+">"
+        msg['From'] = "Iceloof Admin<"+config['email']['admin']+">"
         msg['To'] = to
         msg['Cc'] = config['email']['to']
         part2 = MIMEText(html, 'html')
@@ -58,7 +58,9 @@ def sendEmail(invoiceNo, to, amount, duedate):
         att.add_header('Content-Disposition','attachment',filename='INV'+str(invoiceNo)+'.pdf')
         msg.attach(att)
         msg.attach(part2)
-        s = smtplib.SMTP_SSL(host=config['email']['host'],port=config['email']['port'])
+        s = smtplib.SMTP(host=config['email']['host'],port=config['email']['port'])
+        s.ehlo()
+        s.starttls()
         s.login(config['email']['email'],config['email']['password'])
         s.sendmail(msg['From'], [to, msg['Cc']], msg.as_string())
         s.quit()
