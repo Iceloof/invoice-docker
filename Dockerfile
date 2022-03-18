@@ -1,8 +1,11 @@
 # pull official base image
-FROM ubuntu:20.10
+FROM ubuntu:21.10
 
 # set working directory
 WORKDIR /
+
+ENV TZ=Pacific/Auckland
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 RUN apt-get update \
  && apt-get install -yq --no-install-recommends \
