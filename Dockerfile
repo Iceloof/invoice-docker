@@ -1,5 +1,5 @@
 # pull official base image
-FROM ubuntu:21.10
+FROM ubuntu:20.04
 
 # set working directory
 WORKDIR /
